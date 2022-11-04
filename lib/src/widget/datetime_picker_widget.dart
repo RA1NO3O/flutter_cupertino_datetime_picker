@@ -17,6 +17,7 @@ class DateTimePickerWidget extends StatefulWidget {
     this.minDateTime,
     this.maxDateTime,
     this.initDateTime,
+    this.hourRange,
     this.dateFormat: DATETIME_PICKER_TIME_FORMAT,
     this.dateFormatSeparator: DATE_FORMAT_SEPARATOR,
     this.locale: DATETIME_PICKER_LOCALE_DEFAULT,
@@ -30,9 +31,13 @@ class DateTimePickerWidget extends StatefulWidget {
     DateTime minTime = minDateTime ?? DateTime.parse(DATE_PICKER_MIN_DATETIME);
     DateTime maxTime = maxDateTime ?? DateTime.parse(DATE_PICKER_MAX_DATETIME);
     assert(minTime.compareTo(maxTime) < 0);
+    assert(hourRange == null ||
+        (hourRange!.length == 2 &&
+            hourRange!.every((element) => element >= 0 && element <= 24)));
   }
 
   final DateTime? minDateTime, maxDateTime, initDateTime;
+  final List<int>? hourRange;
   final String dateFormat;
   final String dateFormatSeparator;
   final DateTimePickerLocale locale;
@@ -47,7 +52,8 @@ class DateTimePickerWidget extends StatefulWidget {
       this.minDateTime,
       this.maxDateTime,
       this.initDateTime,
-      this.minuteDivider);
+      this.minuteDivider,
+      this.hourRange);
 }
 
 class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
@@ -60,6 +66,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
       _hourRange,
       _minuteRange,
       _secondRange;
+  List<int>? _setHourRange;
   late FixedExtentScrollController _yearScrollCtrl,
       _monthScrollCtrl,
       _dayScrollCtrl,
@@ -73,7 +80,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
   bool _isChangeTimeRange = false;
 
   _DateTimePickerWidgetState(DateTime? minTime, DateTime? maxTime,
-      DateTime? initTime, int minuteDivider) {
+      DateTime? initTime, int minuteDivider,
+      [List<int>? hourRange]) {
     // check minTime value
     if (minTime == null) {
       minTime = DateTime.parse(DATE_PICKER_MIN_DATETIME);
@@ -96,6 +104,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
 
     this._minTime = minTime;
     this._maxTime = maxTime;
+    this._setHourRange = hourRange;
     this._currYear = initTime.year;
     this._currMonth = initTime.month;
     this._currDay = initTime.day;
@@ -529,9 +538,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
   }
 
   /// whether or not is leap year
-  bool isLeapYear(int year) {
-    return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-  }
+  bool isLeapYear(int year) =>
+      (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
 
   /// calculate selected index list
   List<int> _calcSelectIndexList() {
@@ -544,9 +552,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
   }
 
   /// calculate the range of year
-  List<int> _calcYearRange() {
-    return [_minTime.year, _maxTime.year];
-  }
+  List<int> _calcYearRange() => [_minTime.year, _maxTime.year];
 
   /// calculate the range of month
   List<int> _calcMonthRange() {
@@ -571,32 +577,47 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
     int maxYear = _maxTime.year;
     int minMonth = _minTime.month;
     int maxMonth = _maxTime.month;
-    if (currMonth == null) {
-      currMonth = _currMonth;
+    if (currMonth == null) currMonth = _currMonth;
+    int minHour = _setHourRange?.first ?? 0,
+        maxHour = _setHourRange?.last ?? 23;
+    if (_currYear == _minTime.year && _currMonth == _minTime.month) {
+      minHour = _setHourRange != null
+          ? max(_setHourRange!.first, _minTime.hour)
+          : _minTime.hour;
+    }
+    if (_currYear == _maxTime.year && _currMonth == _maxTime.month) {
+      maxHour = _setHourRange != null
+          ? min(_setHourRange!.last, _maxTime.hour)
+          : _maxTime.hour;
     }
     if (minYear == _currYear && minMonth == currMonth) {
       // selected minimum year and month, limit day range
-      minDay = _minTime.day;
+      minDay = (minHour > maxHour) ? _minTime.day + 1 : _minTime.day;
     }
     if (maxYear == _currYear && maxMonth == currMonth) {
       // selected maximum year and month, limit day range
-      maxDay = _maxTime.day;
+      maxDay = (minHour > maxHour) ? _maxTime.day - 1 : _maxTime.day;
     }
     return [minDay, maxDay];
   }
 
   /// calculate the range of hour
   List<int> _calcHourRange() {
-    int minHour = 0, maxHour = 23;
+    int minHour = _setHourRange?.first ?? 0,
+        maxHour = _setHourRange?.last ?? 23;
     if (_currYear == _minTime.year &&
         _currMonth == _minTime.month &&
         _currDay == _minTime.day) {
-      minHour = _minTime.hour;
+      minHour = _setHourRange != null
+          ? max(_setHourRange!.first, _minTime.hour)
+          : _minTime.hour;
     }
     if (_currYear == _maxTime.year &&
         _currMonth == _maxTime.month &&
         _currDay == _maxTime.day) {
-      maxHour = _maxTime.hour;
+      maxHour = _setHourRange != null
+          ? min(_setHourRange!.last, _maxTime.hour)
+          : _maxTime.hour;
     }
     return [minHour, maxHour];
   }
